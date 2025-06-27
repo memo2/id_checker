@@ -55,10 +55,10 @@ def speeding_check(data):
         print(f"Couldn't complete speeding-check.\n\nError: {e}")
 
 
-def keyboard_smash(data):
+def keyboard_smash(data, open_answer_cols = ['SBA1','CEP1']):
     try:
         # getting SBA or CEP columns
-        SBA_COLS = pp.get_columns(data, starts_with=['SBA1','CEP1'])
+        SBA_COLS = pp.get_columns(data, starts_with = open_answer_cols)
         
         # counting how many mentions each brand name has
         sba_counter = dict()
@@ -293,7 +293,7 @@ def id_check(
         speeding_check(data)
 
     if checks_to_run.get('keyboard_smash'):
-        keyboard_smash(data)
+        keyboard_smash(data, open_answer_cols)
 
     if checks_to_run.get('attention_check'):
         attention_check(data, end_time, start_time)
