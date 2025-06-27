@@ -2,6 +2,8 @@ from . import _preprocessing as pp
 import difflib
 from . import _quality_id_checks as qic
 import pandas as pd
+import importlib.resources
+import os
 
 def speeding_check(data):
     try:
@@ -145,8 +147,13 @@ def badwords_check(data, file, open_answer_cols):
     # Step 1: Load bad words
     open_answer_q = pp.get_columns(data, starts_with=open_answer_cols)
 
-    with open(file, 'r') as f:
-        badwords = set(word.strip().lower() for word in f if word.strip())
+    if not os.path.isabs(file):
+        with importlib.resources.open_text('id_checker.data', file) as f:
+            badwords = set(word.strip().lower() for word in f if word.strip())
+    else:
+        # absolute path: open normally
+        with open(file, 'r') as f:
+            badwords = set(word.strip().lower() for word in f if word.strip())
 
     # Step 2: Function to check if any word in an answer is a bad word
     def contains_badword(answer):
@@ -167,8 +174,13 @@ def lazyanswer_check(data, file, open_answer_cols):
     # Step 1: Load lazy words
     open_answer_q = pp.get_columns(data, starts_with=open_answer_cols)
 
-    with open(file, 'r') as f:
-        lazy_answer = set(word.strip().lower() for word in f if word.strip())
+    if not os.path.isabs(file):
+        with importlib.resources.open_text('id_checker.data', file) as f:
+            lazy_answer = set(word.strip().lower() for word in f if word.strip())
+    else:
+        # absolute path: open normally
+        with open(file, 'r') as f:
+            lazy_answer = set(word.strip().lower() for word in f if word.strip())
 
     # Step 2: Function to check if any word in an answer is a lazy answer
     def contains_lazy_answer(answer):
@@ -195,28 +207,108 @@ def apply_scoring_rules(df, scoring_dict):
     return df
 
 
-def id_check(data, file_bw = 'data/badwords.txt' , file_la = 'data/lazy_answer.txt', open_answer_cols =  ['SBA', 'CEP'],
-            scoring_rules = {
-        'lower_outlier': 2,
-        #'offensive_language': 2,
-        'badwords': 2,
-        #'wrong_language':1.5,
-        'gibberish': 1.5,
-        'lazy_answer': 1,
-        #'repeated_answer': 1,
-        'check_straight_liner':1, 
-        'check_failed_attention':1,
-        'valid_open_answer': -1 }):
+def id_check(
+    data,
+    file_bw='data/badwords.txt',
+    file_la='data/lazy_answer.txt',
+    open_answer_cols=['SBA', 'CEP'],
+    scoring_rules=None,
+    checks_to_run=None,
+):
+    """
+    Perform a series of data quality checks on survey or response data.
 
-    start_time, end_time = qic.get_start_end_columns(data)
+    Parameters
+    ----------
+    data : pd.DataFrame
+        The dataset to run the checks on. This DataFrame will be modified in-place with new columns and scores.
+    
+    file_bw : str, optional
+        Path to the file containing bad words (default is 'data/badwords.txt'). Used in the badwords_check.
+    
+    file_la : str, optional
+        Path to the file containing lazy answer indicators (default is 'data/lazy_answer.txt'). Used in lazyanswer_check.
+    
+    open_answer_cols : list of str, optional
+        List of column prefixes or names that represent open answer columns to be checked (default is ['SBA', 'CEP']).
+    
+    scoring_rules : dict, optional
+        A dictionary mapping check names to their scoring weights. If None, defaults will be used.
+    
+    checks_to_run : dict, optional
+        Dictionary specifying which checks to run. Keys are check names (str), values are booleans.
+        By default, all checks are run. Example:
+            {
+                'speeding_check': True,
+                'keyboard_smash': True,
+                'attention_check': True,
+                'straightlining_check': True,
+                'badwords_check': True,
+                'lazyanswer_check': True,
+                'apply_scoring_rules': True,
+            }
 
-    speeding_check(data)
-    keyboard_smash(data)
-    attention_check(data, end_time, start_time)
-    straightlining_check(data)
-    badwords_check(data, file_bw, open_answer_cols)
-    lazyanswer_check(data, file_la, open_answer_cols)
+    Returns
+    -------
+    pd.DataFrame
+        The input DataFrame with additional scoring columns and checks applied.
 
-    apply_scoring_rules(data,scoring_rules)
-    data['score'] = data['score'].round(2) #rounding decimals to max two digits
+    Notes
+    -----
+    - The function modifies the input DataFrame in-place.
+    - The checks include speeding, keyboard smash detection, attention check, straightlining, bad words, and lazy answers.
+    - Scoring is applied based on the provided or default scoring rules.
+    """
+    if scoring_rules is None:
+        scoring_rules = {
+            'lower_outlier': 2,
+            #'offensive_language': 2,
+            'badwords': 2,
+            #'wrong_language': 1.5,
+            'gibberish': 1.5,
+            'lazy_answer': 1,
+            #'repeated_answer': 1,
+            'check_straight_liner': 1,
+            'check_failed_attention': 1,
+            'valid_open_answer': -1,
+        }
+
+    # Default to run all checks
+    if checks_to_run is None:
+        checks_to_run = {
+            'speeding_check': True,
+            'keyboard_smash': True,
+            'attention_check': True,
+            'straightlining_check': True,
+            'badwords_check': True,
+            'lazyanswer_check': True,
+            'apply_scoring_rules': True,
+        }
+
+    start_time, end_time = None, None
+    if checks_to_run.get('attention_check') or checks_to_run.get('apply_scoring_rules'):
+        start_time, end_time = qic.get_start_end_columns(data)
+
+    if checks_to_run.get('speeding_check'):
+        speeding_check(data)
+
+    if checks_to_run.get('keyboard_smash'):
+        keyboard_smash(data)
+
+    if checks_to_run.get('attention_check'):
+        attention_check(data, end_time, start_time)
+
+    if checks_to_run.get('straightlining_check'):
+        straightlining_check(data)
+
+    if checks_to_run.get('badwords_check'):
+        badwords_check(data, file_bw, open_answer_cols)
+
+    if checks_to_run.get('lazyanswer_check'):
+        lazyanswer_check(data, file_la, open_answer_cols)
+
+    if checks_to_run.get('apply_scoring_rules'):
+        apply_scoring_rules(data, scoring_rules)
+        data['score'] = data['score'].round(2)  # rounding decimals to max two digits
+
     return data
