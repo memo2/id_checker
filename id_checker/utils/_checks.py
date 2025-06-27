@@ -209,8 +209,8 @@ def apply_scoring_rules(df, scoring_dict):
 
 def id_check(
     data,
-    file_bw='data/badwords.txt',
-    file_la='data/lazy_answer.txt',
+    file_bw='badwords.txt',
+    file_la='lazy_answer.txt',
     open_answer_cols=['SBA', 'CEP'],
     scoring_rules=None,
     checks_to_run=None,
