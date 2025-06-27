@@ -62,7 +62,7 @@ def keyboard_smash(data, open_answer_cols = ['SBA1','CEP1']):
         
         # counting how many mentions each brand name has
         sba_counter = dict()
-        for sba_question in SBA_COLS[0:2]: #getting the first two columns identified to look for brand names
+        for sba_question in SBA_COLS: #getting the first two columns identified to look for brand names
             for brand_name in data[sba_question]:
                 brand_name = str(brand_name).lower().strip()
                 if sba_counter.get(brand_name):
