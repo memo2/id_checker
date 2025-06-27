@@ -1,6 +1,6 @@
-from utils import _preprocessing as pp
+from . import _preprocessing as pp
 import difflib
-from utils import _quality_id_checks as qic
+from . import _quality_id_checks as qic
 import pandas as pd
 
 def speeding_check(data):
