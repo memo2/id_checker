@@ -55,66 +55,60 @@ def speeding_check(data):
         print(f"Couldn't complete speeding-check.\n\nError: {e}")
 
 
-def keyboard_smash(data, open_answer_cols = ['SBA1','CEP1']):
+def keyboard_smash(data, open_answer_cols=['SBA1', 'CEP1']):
     try:
         # getting SBA or CEP columns
-        SBA_COLS = pp.get_columns(data, starts_with = open_answer_cols)
+        SBA_COLS = pp.get_columns(data, starts_with=open_answer_cols)
         
+        if len(SBA_COLS) == 0:
+            print("No matching open answer columns found.")
+            return data
+
         # counting how many mentions each brand name has
         sba_counter = dict()
-        for sba_question in SBA_COLS: #getting the first two columns identified to look for brand names
+        for sba_question in SBA_COLS:
             for brand_name in data[sba_question]:
                 brand_name = str(brand_name).lower().strip()
-                if sba_counter.get(brand_name):
-                    sba_counter[brand_name] +=1
-                else:
-                    sba_counter[brand_name]=1
+                if brand_name:
+                    sba_counter[brand_name] = sba_counter.get(brand_name, 0) + 1
 
-        keys_over_one = [k for k, v in sba_counter.items() if v > 2] #if in sba 1 or sba 2 at least 3 mentions
-        #print(f'Total unique entries: {len(sba_counter)}\nMultiple mention entries: {len(keys_over_one)}')
+        keys_over_one = [k for k, v in sba_counter.items() if v > 2]
 
         for brand_name in sba_counter:
             if brand_name not in keys_over_one:
                 matches = difflib.get_close_matches(brand_name, keys_over_one, n=1, cutoff=0.8)
                 if matches:
                     print(f"Received: {brand_name}, did you mean: {matches[0]}?")
-                    keys_over_one.append(brand_name) # add to the list of accepted entries
+                    keys_over_one.append(brand_name)
 
+        # validity check — works for any number of columns
+        data['valid_open_answer'] = False
+        for col in SBA_COLS:
+            data['valid_open_answer'] |= (
+                data[col].fillna('').astype(str).str.lower().str.strip().isin(keys_over_one)
+            )
 
-        data['valid_open_answer'] = (
-        data[SBA_COLS[0]].fillna('').astype(str).str.lower().str.strip().isin(keys_over_one) |
-        data[SBA_COLS[1]].fillna('').astype(str).str.lower().str.strip().isin(keys_over_one) |
-        data[SBA_COLS[0]].fillna('').astype(str).str.strip() == '99999997'
-        )
-
-        data['cond_1'] = data[SBA_COLS[0]].fillna('').astype(str).str.lower().str.strip().isin(keys_over_one)
-        data['cond_2'] = data[SBA_COLS[1]].fillna('').astype(str).str.lower().str.strip().isin(keys_over_one)
-        #data['cond_3'] = data[SBA_COLS[0]].fillna('').astype(str).str.strip() == '99999997'
-
-
-        data['valid_open_answer'] = data['cond_1'] | data['cond_2'] #| data['cond_3']
-        data.drop(columns=['cond_1','cond_2'])# getting rid of condition columns
-
-        # # if either their first or second entry is in th
-        # data['valid_open_answer'] = (
-        #     data[SBA_COLS[0]].fillna('').str.lower().str.strip().isin(keys_over_one) |
-        #     data[SBA_COLS[1]].fillna('').str.lower().str.strip().isin(keys_over_one)
-        #     )
-        # #print(f"Data in valid open answer: {data[data['valid_open_answer'] == True].shape}")
-
-
-        # data['valid_open_answer'] = (data[SBA_COLS[0]].astype(str).str.strip() == '99999997')
-        # print(f"Data in valid open answer: {data[data['valid_open_answer'] == True].shape}")
+        # Optional: check if special code like '99999997' should also be accepted
+        if SBA_COLS:
+            data['valid_open_answer'] |= (
+                data[SBA_COLS[0]].fillna('').astype(str).str.strip() == '99999997'
+            )
 
         # filtering out every response that is seen as valid
         unchecked_data = data[data['valid_open_answer'] == False]
 
-        # Apply row-wise
-        data['gibberish'] = unchecked_data[SBA_COLS[0]].apply(lambda x: qic.check_gibberish(x, keys_over_one))
+        # Apply gibberish check only to unchecked data
+        data['gibberish'] = False
+        if SBA_COLS:
+            data.loc[unchecked_data.index, 'gibberish'] = unchecked_data[SBA_COLS[0]].apply(
+                lambda x: qic.check_gibberish(x, keys_over_one)
+            )
+
         return data
 
     except Exception as e:
         print(f"Couldn't complete gibberish/keyboard-smash-check.\n\nError: {e}")
+
 
 
 def attention_check(data, end_time, start_time):
