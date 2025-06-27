@@ -1,9 +1,9 @@
-import addons
 from io import StringIO
 import pandas as pd
 import time
 import openai
 from openai import OpenAIError
+from . import _preprocessing as pp
 from ._keyboard_smash import is_mashing
 
 
@@ -41,8 +41,8 @@ def mark_oversample(data, sample_requested, check_column) -> 'Data':
 
 # finding all the start and end columns in order to determine the survey time later 
 def get_start_end_columns(data):
-    start_col = addons.get_columns(data, starts_with=['tstart','start', 'xtstart'])
-    end_col = addons.get_columns(data, starts_with=['teind','eind', 'xteind'])
+    start_col = pp.get_columns(data, starts_with=['tstart','start', 'xtstart'])
+    end_col = pp.get_columns(data, starts_with=['teind','eind', 'xteind'])
     if len(start_col) == 1 and len(end_col) ==1:
         return start_col[0], end_col[0]
     else:
@@ -167,7 +167,7 @@ print(df)
 
 
 def attention_check(data: 'DataFrame', end_time, start_time)-> 'attention_column':
-    attention = addons.get_columns(data, starts_with=['Test', 'attention'], ends_with=['Attention', 'att', 'test'])[0]
+    attention = pp.get_columns(data, starts_with=['Test', 'attention'], ends_with=['Attention', 'att', 'test'])[0]
 
     #removing trailing white spaces
     data[end_time] = data[end_time].str.strip()
@@ -206,7 +206,7 @@ def straight_lining(data):
 
         for block in blocks:
             # Get all statement columns starting with the block prefix
-            statements = addons.get_columns(data, starts_with=[block])
+            statements = pp.get_columns(data, starts_with=[block])
 
             # Check for straightlining per row: all values across the row in these columns are the same
             is_straight_liner = data[statements].nunique(axis=1) == 1
